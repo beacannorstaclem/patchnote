@@ -41,6 +41,12 @@ describe('buildReleaseNotes', () => {
     const notes = buildReleaseNotes(commits, { version: '2.0.0' });
     expect(notes.breakingChanges).toHaveLength(1);
   });
+
+  it('returns empty sections for empty commit list', () => {
+    const notes = buildReleaseNotes([], { version: '1.0.0' });
+    expect(notes.sections).toHaveLength(0);
+    expect(notes.breakingChanges).toHaveLength(0);
+  });
 });
 
 describe('formatMarkdown', () => {
@@ -79,5 +85,14 @@ describe('formatMarkdown', () => {
     const md = formatMarkdown(notes);
     expect(md).toContain('⚠️ Breaking Changes');
     expect(md).toContain('drop node 14');
+  });
+
+  it('does not render breaking changes section when there are none', () => {
+    const notes = buildReleaseNotes(
+      [makeCommit({ breaking: false, type: 'feat', subject: 'safe change' })],
+      { version: '1.2.0' }
+    );
+    const md = formatMarkdown(notes);
+    expect(md).not.toContain('⚠️ Breaking Changes');
   });
 });
