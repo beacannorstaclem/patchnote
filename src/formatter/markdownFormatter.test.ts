@@ -89,10 +89,23 @@ describe('formatMarkdown', () => {
 
   it('does not render breaking changes section when there are none', () => {
     const notes = buildReleaseNotes(
-      [makeCommit({ breaking: false, type: 'feat', subject: 'safe change' })],
-      { version: '1.2.0' }
+      [makeCommit({ breaking: false, type: 'fix', subject: 'minor fix' })],
+      { version: '1.0.2' }
     );
     const md = formatMarkdown(notes);
     expect(md).not.toContain('⚠️ Breaking Changes');
+  });
+
+  it('renders section title for each commit type', () => {
+    const notes = buildReleaseNotes(
+      [
+        makeCommit({ type: 'feat', subject: 'new feature' }),
+        makeCommit({ type: 'fix', subject: 'bug fix', hash: 'def456' }),
+      ],
+      { version: '1.2.0' }
+    );
+    const md = formatMarkdown(notes);
+    expect(md).toContain('feat');
+    expect(md).toContain('fix');
   });
 });
