@@ -1,61 +1,62 @@
-import type { ParsedCommit, ReleaseSection } from './types';
+import { ParsedCommit } from './types';
 
 /**
- * Groups commits within a section by their scope.
- * Useful for large releases with many scoped changes.
+ * Extracts unique scopes from a list of commits.
  */
-export function groupByScope(
-  section: ReleaseSection
-): Record<string, ParsedCommit[]> {
-  const groups: Record<string, ParsedCommit[]> = {};
-
-  for (const commit of section.commits) {
-    const key = commit.scope ?? 'general';
-    if (!groups[key]) groups[key] = [];
-    groups[key].push(commit);
-  }
-
-  return groups;
+export function extractScopes(commits: ParsedCommit[]): string[] {
+  const scopes = commits
+    .map((c) => c.scope)
+    .filter((s): s is string => typeof s === 'string' && s.length > 0);
+  return [...new Set(scopes)];
 }
 
 /**
- * Renders a section with commits grouped by scope into markdown.
+ * Groups commits by their scope. Commits without a scope are grouped under ''.
+ */
+export function groupByScope(commits: ParsedCommit[]): Record<string, ParsedCommit[]> {
+  return commits.reduce<Record<string, ParsedCommit[]>>((acc, commit) => {
+    const key = commit.scope ?? '';
+    if (!acc[key]) {
+      acc[key] = [];
+    }
+    acc[key].push(commit);
+    return acc;
+  }, {});
+}
+
+/**
+ * Formats a changelog section grouping commits by scope.
+ * Scoped commits appear under bold scope headers; unscoped commits are listed directly.
  */
 export function formatSectionWithScopes(
-  section: ReleaseSection,
-  repoUrl?: string
+  sectionTitle: string,
+  commits: ParsedCommit[]
 ): string {
-  const lines: string[] = [];
-  const grouped = groupByScope(section);
+  if (commits.length === 0) return '';
 
-  lines.push(`### ${section.title}`);
-  lines.push('');
+  const grouped = groupByScope(commits);
+  const lines: string[] = [`### ${sectionTitle}`, ''];
 
-  for (const [scope, commits] of Object.entries(grouped)) {
-    if (scope !== 'general') {
-      lines.push(`#### ${scope}`);
-      lines.push('');
-    }
-    for (const commit of commits) {
-      const hashShort = commit.hash.slice(0, 7);
-      const hashRef = repoUrl
-        ? `([${hashShort}](${repoUrl}/commit/${commit.hash}))`
-        : `(${hashShort})`;
-      lines.push(`- ${commit.subject} ${hashRef}`);
+  const scopes = Object.keys(grouped).sort();
+
+  // Render unscoped commits first
+  const unscopedKey = '';
+  if (grouped[unscopedKey]?.length) {
+    for (const commit of grouped[unscopedKey]) {
+      lines.push(`- ${commit.description} (${commit.hash.slice(0, 7)})`);
     }
     lines.push('');
   }
 
-  return lines.join('\n').trimEnd();
-}
-
-/**
- * Returns a sorted list of unique scopes found across all commits.
- */
-export function extractScopes(commits: ParsedCommit[]): string[] {
-  const scopes = new Set<string>();
-  for (const commit of commits) {
-    if (commit.scope) scopes.add(commit.scope);
+  // Render scoped commits grouped under their scope header
+  for (const scope of scopes) {
+    if (scope === unscopedKey) continue;
+    lines.push(`- **${scope}**`);
+    for (const commit of grouped[scope]) {
+      lines.push(`  - ${commit.description} (${commit.hash.slice(0, 7)})`);
+    }
   }
-  return Array.from(scopes).sort();
+
+  lines.push('');
+  return lines.join('\n');
 }
